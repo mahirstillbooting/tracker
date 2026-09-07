@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { MapPin, ShieldCheck, User, Lock, AlertCircle, ArrowRight } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api/auth';
+import { API_AUTH_URL as API_BASE_URL } from '../config';
 
 export default function Auth({ onLoginSuccess }) {
   const [isLogin, setIsLogin] = useState(true);

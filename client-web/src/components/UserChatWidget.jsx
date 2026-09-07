@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MessageSquare, X, Send, ShieldCheck, User } from 'lucide-react';
 
-const API_BASE_URL = 'http://localhost:5000/api/chat';
+import { API_CHAT_URL as API_BASE_URL } from '../config';
 
 export default function UserChatWidget({ user, socket }) {
   const [isOpen, setIsOpen] = useState(false);

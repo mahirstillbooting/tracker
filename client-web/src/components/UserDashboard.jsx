@@ -5,7 +5,7 @@ import { LogOut, User, Navigation, Radio, MapPin, AlertTriangle } from 'lucide-r
 import { userIcon } from '../utils/leafletFix';
 import UserChatWidget from './UserChatWidget';
 
-const SOCKET_SERVER_URL = 'http://localhost:5000';
+import { SOCKET_SERVER_URL } from '../config';
 
 function MapRecenter({ position }) {
   const map = useMap();

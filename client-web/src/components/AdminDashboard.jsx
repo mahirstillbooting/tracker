@@ -19,8 +19,7 @@ import {
 } from 'lucide-react';
 import { activeUserIcon, offlineUserIcon } from '../utils/leafletFix';
 
-const SOCKET_SERVER_URL = 'http://localhost:5000';
-const API_BASE_URL = 'http://localhost:5000/api';
+import { SOCKET_SERVER_URL, API_ADMIN_URL as API_BASE_URL } from '../config';
 
 function MapFlyTo({ targetCoords }) {
   const map = useMap();
