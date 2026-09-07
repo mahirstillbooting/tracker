@@ -50,6 +50,7 @@ io.on('connection', (socket) => {
     if (!data) return;
     const { userId, role } = data;
     if (userId) {
+      activeSocketUsers.set(socket.id, userId.toString());
       socket.join(userId.toString());
       console.log(`[Socket] Client ${socket.id} joined user room: ${userId}`);
     }

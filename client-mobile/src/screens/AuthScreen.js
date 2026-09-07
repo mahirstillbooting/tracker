@@ -12,13 +12,14 @@ import {
 } from 'react-native';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { MapPin, User, Lock, AlertCircle, ArrowRight } from 'lucide-react-native';
+import { MapPin, User, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react-native';
 import { API_URL } from '../config';
 
 export default function AuthScreen({ onLoginSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -137,10 +138,21 @@ export default function AuthScreen({ onLoginSuccess }) {
                 style={styles.input}
                 placeholder="Enter password"
                 placeholderTextColor="#64748b"
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={setPassword}
               />
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color="#94a3b8" />
+                ) : (
+                  <Eye size={20} color="#94a3b8" />
+                )}
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -278,6 +290,10 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: 8,
+  },
+  eyeBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
   input: {
     flex: 1,

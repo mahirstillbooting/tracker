@@ -113,6 +113,9 @@ export default function UserDashboard({ user, onLogout }) {
       if (!socketRef.current) {
         const socket = io(API_URL, {
           transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionAttempts: 10,
+          reconnectionDelay: 2000,
         });
         socketRef.current = socket;
 
@@ -120,30 +123,48 @@ export default function UserDashboard({ user, onLogout }) {
           console.log('[Mobile] Socket connected:', socket.id);
           setIsConnected(true);
           socket.emit('join-room', { userId: user.id, role: 'user' });
+
+          if (lastValidLocation.current) {
+            socket.emit('update-location', {
+              userId: user.id,
+              latitude: lastValidLocation.current.latitude,
+              longitude: lastValidLocation.current.longitude,
+            });
+          }
         });
 
         socket.on('disconnect', () => {
           console.log('[Mobile] Socket disconnected');
           setIsConnected(false);
         });
+      } else if (!socketRef.current.connected) {
+        socketRef.current.connect();
       }
 
-      // 2. Request Foreground Location Permission
+      // 2. Request Foreground Location Permission & Check GPS Services
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Location permission is required for live tracking.');
         return;
       }
 
-      // 3. Immediate One-Shot Position Fix
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        Alert.alert('GPS Disabled', 'Please enable Location Services (GPS) in your phone settings.');
+      }
+
+      // 3. Fast Last-Known & One-Shot Position Fix
       try {
-        const initialPos = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        let initialPos = await Location.getLastKnownPositionAsync();
+        if (!initialPos) {
+          initialPos = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+        }
 
         if (initialPos && initialPos.coords) {
           const { latitude, longitude } = initialPos.coords;
-          console.log(`[Mobile GPS] Immediate one-shot fix: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
+          console.log(`[Mobile GPS] Immediate fix acquired: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
           setLocation({ latitude, longitude });
           setGpsReady(true);
           lastValidLocation.current = { latitude, longitude };
@@ -159,27 +180,27 @@ export default function UserDashboard({ user, onLogout }) {
           }
         }
       } catch (oneShotErr) {
-        console.warn('[Mobile GPS] One-shot fix skipped, relying on watcher:', oneShotErr.message);
+        console.warn('[Mobile GPS] Quick fix skipped, relying on watcher:', oneShotErr.message);
       }
 
-      // 4. Continuous Location Watcher with Error Handling & Dual-Filter
+      // 4. Continuous Location Watcher
       if (!locationSubRef.current) {
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Balanced,
-            timeInterval: 4000,
-            distanceInterval: 5,
+            timeInterval: 3000,
+            distanceInterval: 3,
           },
           (loc) => {
             const { latitude, longitude, accuracy } = loc.coords;
 
-            // Accuracy filter: discard noisy satellite readings > 25m
-            if (accuracy && accuracy > 25) {
-              console.log(`[GPS Filter] Discarded noisy reading (accuracy: ${accuracy.toFixed(1)}m > 25m)`);
+            // Discard extreme outlier noise > 100m
+            if (accuracy && accuracy > 100) {
+              console.log(`[GPS Filter] Discarded extreme outlier (accuracy: ${accuracy.toFixed(1)}m > 100m)`);
               return;
             }
 
-            // Distance step filter: ignore micro-movements < 8m
+            // Micro-movement step filter < 3m
             if (lastValidLocation.current) {
               const dist = getDistanceMeters(
                 lastValidLocation.current.latitude,
@@ -187,13 +208,12 @@ export default function UserDashboard({ user, onLogout }) {
                 latitude,
                 longitude
               );
-              if (dist < 8) {
-                console.log(`[GPS Filter] Discarded micro-movement (${dist.toFixed(1)}m < 8m)`);
+              if (dist < 3) {
                 return;
               }
             }
 
-            console.log(`[GPS Filter] Accepted location: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
+            console.log(`[GPS Watcher] Accepted location: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
             const newPos = { latitude, longitude };
             lastValidLocation.current = newPos;
             setLocation(newPos);
@@ -201,7 +221,7 @@ export default function UserDashboard({ user, onLogout }) {
 
             injectMapLocation(latitude, longitude);
 
-            if (socketRef.current) {
+            if (socketRef.current && socketRef.current.connected) {
               socketRef.current.emit('update-location', {
                 userId: user.id,
                 latitude,
