@@ -84,34 +84,34 @@ export default function UserDashboard({ user, onLogout }) {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 font-sans overflow-hidden">
-      {/* Sleek Dark Top Bar */}
-      <header className="h-16 bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between z-20 shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-600/10 border border-blue-500/20 text-blue-500 rounded-xl">
-            <Navigation className="w-5 h-5" />
+      {/* Sleek Dark Responsive Top Bar */}
+      <header className="min-h-16 bg-slate-900 border-b border-slate-800 px-4 sm:px-6 py-2.5 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 z-20 shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 sm:p-2 bg-blue-600/10 border border-blue-500/20 text-blue-500 rounded-xl">
+            <Navigation className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-slate-100 flex items-center gap-2">
+            <h1 className="text-sm sm:text-base font-bold text-slate-100 flex items-center gap-2">
               <span>Tracker Dashboard</span>
             </h1>
-            <p className="text-xs text-slate-400">User Portal</p>
+            <p className="text-[10px] sm:text-xs text-slate-400">User Portal</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-xs">
-            <User className="w-4 h-4 text-blue-400" />
-            <span className="font-semibold text-slate-100">{user.username}</span>
+        <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 text-xs">
+            <User className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-semibold text-slate-100 text-xs">{user.username}</span>
             <span className="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] uppercase font-bold">
               {user.role}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-xl text-xs">
             <Radio
-              className={`w-4 h-4 ${isConnected ? 'text-emerald-400 animate-pulse' : 'text-red-400'}`}
+              className={`w-3.5 h-3.5 ${isConnected ? 'text-emerald-400 animate-pulse' : 'text-red-400'}`}
             />
-            <span className="font-medium">
+            <span className="font-medium text-xs">
               {isConnected ? (
                 <span className="text-emerald-400">Online</span>
               ) : (
@@ -122,9 +122,9 @@ export default function UserDashboard({ user, onLogout }) {
 
           <button
             onClick={onLogout}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl text-xs font-semibold transition-all duration-200"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 rounded-xl text-xs font-semibold transition-all duration-200"
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>Logout</span>
           </button>
         </div>

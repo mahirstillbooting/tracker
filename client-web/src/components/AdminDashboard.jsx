@@ -16,6 +16,7 @@ import {
   Send,
   X,
   Activity,
+  Trash2,
 } from 'lucide-react';
 import { activeUserIcon, offlineUserIcon } from '../utils/leafletFix';
 
@@ -156,6 +157,17 @@ export default function AdminDashboard({ user, onLogout }) {
       });
     });
 
+    // Live User Deletion Broadcast
+    socket.on('user-deleted', ({ userId }) => {
+      if (!userId) return;
+      setUsersMap((prev) => {
+        const copy = { ...prev };
+        delete copy[userId];
+        return copy;
+      });
+      setChatThreads((prev) => prev.filter((t) => (t.userId || t.id) !== userId));
+    });
+
     return () => {
       if (socketRef.current) {
         socketRef.current.disconnect();
@@ -214,6 +226,38 @@ export default function AdminDashboard({ user, onLogout }) {
   const handleLocateUser = (u) => {
     if (u.latitude && u.longitude) {
       setTargetFlyCoords([u.latitude, u.longitude]);
+    }
+  };
+
+  const handleDeleteUser = async (u) => {
+    const targetId = u.userId || u.id;
+    if (!targetId) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete user "${u.username}"? This will permanently remove their account, location records, and chat history.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const token = localStorage.getItem('tracker_token');
+      await axios.delete(`${API_BASE_URL}/admin/user/${targetId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setUsersMap((prev) => {
+        const copy = { ...prev };
+        delete copy[targetId];
+        return copy;
+      });
+
+      setChatThreads((prev) => prev.filter((t) => (t.userId || t.id) !== targetId));
+
+      if (selectedUserChat && (selectedUserChat.userId === targetId || selectedUserChat.id === targetId)) {
+        setSelectedUserChat(null);
+      }
+    } catch (err) {
+      console.error('Delete user error:', err);
+      alert(err.response?.data?.message || 'Failed to delete user from database');
     }
   };
 
@@ -367,11 +411,19 @@ export default function AdminDashboard({ user, onLogout }) {
                             <button
                               onClick={() => handleLocateUser(u)}
                               className="px-2 py-1.5 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 text-blue-400 rounded-lg text-xs font-medium flex items-center gap-1"
+                              title="Locate on Map"
                             >
                               <Navigation2 className="w-3.5 h-3.5" />
                               <span>Locate</span>
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeleteUser(u)}
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 rounded-lg text-xs transition-all"
+                            title="Delete User from Database"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     ))}
