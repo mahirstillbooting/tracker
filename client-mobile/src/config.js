@@ -1,3 +1,2 @@
-// Centralized backend connection
-// When testing locally via Expo Go on phone: use PC's LAN IP
-export const API_URL = 'http://192.168.0.9:5000';
+// Centralized backend connection pointing to live Render backend
+export const API_URL = 'https://tracker-server-9626.onrender.com';

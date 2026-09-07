@@ -1,11 +1,26 @@
 {
   "expo": {
-    "name": "Tracker Mobile",
-    "slug": "tracker-client-mobile",
+    "name": "Tracker",
+    "slug": "tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "android": {
+      "package": "com.tracker.app",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Tracker to share your live location."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     }
