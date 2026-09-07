@@ -1,0 +1,489 @@
+import React, { useEffect, useState, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  SafeAreaView,
+  StatusBar,
+  Alert,
+  AppState,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
+import { WebView } from 'react-native-webview';
+import * as Location from 'expo-location';
+import { io } from 'socket.io-client';
+import { LogOut, User, Navigation, MessageSquare } from 'lucide-react-native';
+import { API_URL } from '../config';
+import ChatModal from '../components/ChatModal';
+
+// Haversine Distance Utility (calculates distance in meters)
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+const getLeafletHtml = () => `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #0f172a; }
+    .leaflet-tile-container img { filter: none !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: false }).setView([23.6850, 90.3563], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    var userIcon = L.icon({
+      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+
+    var userMarker = null;
+
+    window.updateUserLocation = function(lat, lng) {
+      if (!userMarker) {
+        userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map)
+          .bindPopup('<b>You</b><br>Your live location');
+        map.setView([lat, lng], 16);
+      } else {
+        userMarker.setLatLng([lat, lng]);
+        map.panTo([lat, lng], { animate: true, duration: 1 });
+      }
+    };
+
+    window.userMarker = userMarker;
+    window.map = map;
+  </script>
+</body>
+</html>
+`;
+
+export default function UserDashboard({ user, onLogout }) {
+  // Default coordinates: Bangladesh center [23.6850, 90.3563]
+  const [location, setLocation] = useState({ latitude: 23.6850, longitude: 90.3563 });
+  const [gpsReady, setGpsReady] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [chatVisible, setChatVisible] = useState(false);
+
+  const socketRef = useRef(null);
+  const locationSubRef = useRef(null);
+  const webViewRef = useRef(null);
+  const lastValidLocation = useRef(null);
+
+  // Helper to inject JavaScript script into Leaflet WebView
+  const injectMapLocation = (lat, lng) => {
+    if (webViewRef.current) {
+      const script = `
+        if (window.updateUserLocation) {
+          window.updateUserLocation(${lat}, ${lng});
+        }
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+  };
+
+  const startTracking = async () => {
+    try {
+      // 1. Socket.io initialization
+      if (!socketRef.current) {
+        const socket = io(API_URL, {
+          transports: ['websocket', 'polling'],
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+          console.log('[Mobile] Socket connected:', socket.id);
+          setIsConnected(true);
+          socket.emit('join-room', { userId: user.id, role: 'user' });
+        });
+
+        socket.on('disconnect', () => {
+          console.log('[Mobile] Socket disconnected');
+          setIsConnected(false);
+        });
+      }
+
+      // 2. Request Foreground Location Permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required for live tracking.');
+        return;
+      }
+
+      // 3. Immediate One-Shot Position Fix
+      try {
+        const initialPos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        if (initialPos && initialPos.coords) {
+          const { latitude, longitude } = initialPos.coords;
+          console.log(`[Mobile GPS] Immediate one-shot fix: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
+          setLocation({ latitude, longitude });
+          setGpsReady(true);
+          lastValidLocation.current = { latitude, longitude };
+
+          injectMapLocation(latitude, longitude);
+
+          if (socketRef.current) {
+            socketRef.current.emit('update-location', {
+              userId: user.id,
+              latitude,
+              longitude,
+            });
+          }
+        }
+      } catch (oneShotErr) {
+        console.warn('[Mobile GPS] One-shot fix skipped, relying on watcher:', oneShotErr.message);
+      }
+
+      // 4. Continuous Location Watcher with Error Handling & Dual-Filter
+      if (!locationSubRef.current) {
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            timeInterval: 4000,
+            distanceInterval: 5,
+          },
+          (loc) => {
+            const { latitude, longitude, accuracy } = loc.coords;
+
+            // Accuracy filter: discard noisy satellite readings > 25m
+            if (accuracy && accuracy > 25) {
+              console.log(`[GPS Filter] Discarded noisy reading (accuracy: ${accuracy.toFixed(1)}m > 25m)`);
+              return;
+            }
+
+            // Distance step filter: ignore micro-movements < 8m
+            if (lastValidLocation.current) {
+              const dist = getDistanceMeters(
+                lastValidLocation.current.latitude,
+                lastValidLocation.current.longitude,
+                latitude,
+                longitude
+              );
+              if (dist < 8) {
+                console.log(`[GPS Filter] Discarded micro-movement (${dist.toFixed(1)}m < 8m)`);
+                return;
+              }
+            }
+
+            console.log(`[GPS Filter] Accepted location: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
+            const newPos = { latitude, longitude };
+            lastValidLocation.current = newPos;
+            setLocation(newPos);
+            setGpsReady(true);
+
+            injectMapLocation(latitude, longitude);
+
+            if (socketRef.current) {
+              socketRef.current.emit('update-location', {
+                userId: user.id,
+                latitude,
+                longitude,
+              });
+            }
+          }
+        );
+        locationSubRef.current = sub;
+      }
+    } catch (err) {
+      console.error('[Mobile] Location tracking error:', err);
+    }
+  };
+
+  const stopTracking = () => {
+    if (locationSubRef.current) {
+      console.log('[Mobile] Stopping location watcher');
+      locationSubRef.current.remove();
+      locationSubRef.current = null;
+    }
+    if (socketRef.current) {
+      console.log('[Mobile] Disconnecting socket');
+      socketRef.current.disconnect();
+      socketRef.current = null;
+      setIsConnected(false);
+    }
+  };
+
+  useEffect(() => {
+    startTracking();
+
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        startTracking();
+      } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+        stopTracking();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+      stopTracking();
+    };
+  }, [user]);
+
+  const handleLogoutPress = () => {
+    stopTracking();
+    onLogout();
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+
+      {/* Top Navigation Bar */}
+      <View style={styles.topBar}>
+        <View style={styles.userInfo}>
+          <View style={styles.userIconBadge}>
+            <User size={16} color="#3b82f6" />
+          </View>
+          <View>
+            <Text style={styles.userName}>{user.username}</Text>
+            <Text style={styles.userRole}>{user.role.toUpperCase()}</Text>
+          </View>
+        </View>
+
+        <View style={styles.rightActions}>
+          <View style={styles.statusBadge}>
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: isConnected ? '#10b981' : '#ef4444' },
+              ]}
+            />
+            <Text style={[styles.statusText, { color: isConnected ? '#10b981' : '#ef4444' }]}>
+              {isConnected ? 'Online' : 'Offline'}
+            </Text>
+          </View>
+
+          <TouchableOpacity style={styles.chatBtn} onPress={() => setChatVisible(true)}>
+            <MessageSquare size={16} color="#3b82f6" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogoutPress}>
+            <LogOut size={16} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Main Map Container */}
+      <View style={styles.mapWrapper}>
+        {/* Subtle Non-Blocking Floating Acquisition Banner */}
+        {!gpsReady && (
+          <View style={styles.acquisitionBanner}>
+            <ActivityIndicator size="small" color="#3b82f6" />
+            <Text style={styles.acquisitionText}>Acquiring high-precision GPS...</Text>
+          </View>
+        )}
+
+        <WebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: getLeafletHtml() }}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          style={{ flex: 1, width: '100%', height: '100%' }}
+          containerStyle={{ flex: 1 }}
+          onLoadEnd={() => {
+            if (location) {
+              injectMapLocation(location.latitude, location.longitude);
+            }
+          }}
+        />
+
+        {/* Live Coordinate Card Overlay */}
+        <View style={styles.coordCard}>
+          <Navigation size={18} color="#3b82f6" />
+          <View style={styles.coordTextContainer}>
+            <Text style={styles.coordTitle}>
+              {gpsReady ? 'Live GPS Active (Filtered)' : 'Initializing Location'}
+            </Text>
+            <Text style={styles.coordValue}>
+              Lat: {location.latitude.toFixed(5)} | Lng: {location.longitude.toFixed(5)}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Chat Modal */}
+      <ChatModal
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+        user={user}
+        socket={socketRef.current}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  topBar: {
+    height: 60,
+    backgroundColor: '#1e293b',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 10,
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  userIconBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#0f172a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#f8fafc',
+  },
+  userRole: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#3b82f6',
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+    gap: 6,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chatBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+  },
+  logoutBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  mapWrapper: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#0f172a',
+    position: 'relative',
+  },
+  acquisitionBanner: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    backgroundColor: 'rgba(15, 23, 42, 0.9)',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  acquisitionText: {
+    color: '#94a3b8',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  coordCard: {
+    position: 'absolute',
+    bottom: 24,
+    left: 16,
+    right: 16,
+    backgroundColor: '#1e293b',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    elevation: 8,
+  },
+  coordTextContainer: {
+    flex: 1,
+  },
+  coordTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#f8fafc',
+  },
+  coordValue: {
+    fontSize: 11,
+    color: '#94a3b8',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginTop: 2,
+  },
+});
