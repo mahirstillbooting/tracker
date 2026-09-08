@@ -281,10 +281,10 @@ export default function UserDashboard({ user, onLogout }) {
       <View style={styles.topBar}>
         <View style={styles.userInfo}>
           <View style={styles.userIconBadge}>
-            <User size={16} color="#3b82f6" />
+            <User size={18} color="#3b82f6" />
           </View>
-          <View>
-            <Text style={styles.userName}>{user.username}</Text>
+          <View style={styles.userTextCol}>
+            <Text style={styles.userName} numberOfLines={1}>{user.username}</Text>
             <Text style={styles.userRole}>{user.role.toUpperCase()}</Text>
           </View>
         </View>
@@ -302,12 +302,12 @@ export default function UserDashboard({ user, onLogout }) {
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.chatBtn} onPress={() => setChatVisible(true)}>
-            <MessageSquare size={16} color="#3b82f6" />
+          <TouchableOpacity style={styles.chatBtn} onPress={() => setChatVisible(true)} activeOpacity={0.7}>
+            <MessageSquare size={20} color="#3b82f6" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogoutPress}>
-            <LogOut size={16} color="#ef4444" />
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogoutPress} activeOpacity={0.7}>
+            <LogOut size={20} color="#ef4444" />
           </TouchableOpacity>
         </View>
       </View>
@@ -366,11 +366,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0,
+    paddingTop: Platform.OS === 'android' ? ((StatusBar.currentHeight || 30) + 6) : 0,
   },
   topBar: {
-    minHeight: 60,
-    paddingVertical: 10,
+    minHeight: 64,
+    paddingVertical: 8,
     backgroundColor: '#1e293b',
     borderBottomWidth: 1,
     borderBottomColor: '#334155',
@@ -383,20 +383,25 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flex: 1,
+    marginRight: 6,
   },
   userIconBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#334155',
   },
+  userTextCol: {
+    flexShrink: 1,
+  },
   userName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#f8fafc',
   },
@@ -408,18 +413,18 @@ const styles = StyleSheet.create({
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0f172a',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 6,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#334155',
-    gap: 6,
+    gap: 5,
   },
   statusDot: {
     width: 8,
@@ -428,27 +433,27 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   chatBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.2)',
+    borderColor: 'rgba(59, 130, 246, 0.3)',
   },
   logoutBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(239, 68, 68, 0.2)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
   },
   mapWrapper: {
     flex: 1,

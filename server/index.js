@@ -47,13 +47,31 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Room Join Event
-  socket.on('join-room', (data) => {
+  socket.on('join-room', async (data) => {
     if (!data) return;
     const { userId, role } = data;
     if (userId) {
       activeSocketUsers.set(socket.id, userId.toString());
       socket.join(userId.toString());
       console.log(`[Socket] Client ${socket.id} joined user room: ${userId}`);
+
+      if (role !== 'admin') {
+        try {
+          const user = await User.findByIdAndUpdate(userId, { isActive: true }, { new: true });
+          const lastLoc = await Location.findOne({ userId }).sort({ updatedAt: -1 });
+
+          io.emit('location-updated', {
+            userId,
+            username: user ? user.username : 'User',
+            latitude: lastLoc ? lastLoc.latitude : null,
+            longitude: lastLoc ? lastLoc.longitude : null,
+            isActive: true,
+            updatedAt: lastLoc ? lastLoc.updatedAt : new Date(),
+          });
+        } catch (err) {
+          console.error('[Socket] Error setting user active on join-room:', err);
+        }
+      }
     }
     if (role === 'admin') {
       socket.join('admins');
