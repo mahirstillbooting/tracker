@@ -15,15 +15,17 @@ import {
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MessageSquare, Send, X, ShieldCheck } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../config';
 
 export default function ChatModal({ visible, onClose, user, socket, targetUser }) {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const flatListRef = useRef(null);
 
   const isUserRole = user.role === 'user';
-  const chatUserId = isUserRole ? user.id : targetUser?.userId || targetUser?.id;
+  const chatUserId = isUserRole ? user.id || user._id : targetUser?.userId || targetUser?.id;
   const chatUsername = isUserRole ? 'Admin Support' : targetUser?.username || 'User';
 
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
       if (
         newMsg.senderId === chatUserId ||
         newMsg.targetUserId === chatUserId ||
-        (isUserRole && (newMsg.senderId === user.id || newMsg.targetUserId === user.id))
+        (isUserRole && (newMsg.senderId === (user.id || user._id) || newMsg.targetUserId === (user.id || user._id)))
       ) {
         setMessages((prev) => {
           if (prev.some((m) => m._id && m._id === newMsg._id)) return prev;
@@ -69,16 +71,17 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
 
   const handleSend = () => {
     if (!inputText.trim() || !socket) return;
+    const currentUserId = user.id || user._id;
 
     if (isUserRole) {
       socket.emit('chat:send-to-admin', {
-        userId: user.id,
+        userId: currentUserId,
         username: user.username,
         content: inputText.trim(),
       });
     } else {
       socket.emit('chat:admin-reply', {
-        adminId: user.id,
+        adminId: currentUserId,
         adminUsername: user.username,
         targetUserId: chatUserId,
         content: inputText.trim(),
@@ -88,9 +91,13 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
     setInputText('');
   };
 
+  const dynamicTopPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0) + 4;
+  const dynamicBottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 12) + 8;
+
   return (
     <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onClose}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+        <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={true} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardContainer}
@@ -122,7 +129,7 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
             contentContainerStyle={styles.messagesList}
             onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
             renderItem={({ item }) => {
-              const isMe = item.senderId === user.id;
+              const isMe = item.senderId === (user.id || user._id);
               return (
                 <View
                   style={[
@@ -156,7 +163,7 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
           />
 
           {/* Input Bar */}
-          <View style={styles.inputBar}>
+          <View style={[styles.inputBar, { paddingBottom: dynamicBottomPadding }]}>
             <TextInput
               style={styles.input}
               placeholder="Type a message..."

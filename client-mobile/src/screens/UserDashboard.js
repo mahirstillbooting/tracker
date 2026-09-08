@@ -15,6 +15,7 @@ import { WebView } from 'react-native-webview';
 import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { LogOut, User, Navigation, MessageSquare } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_URL } from '../config';
 import ChatModal from '../components/ChatModal';
 
@@ -83,6 +84,9 @@ const getLeafletHtml = () => `
 `;
 
 export default function UserDashboard({ user, onLogout }) {
+  const insets = useSafeAreaInsets();
+  const currentUserId = user.id || user._id;
+
   // Default coordinates: Bangladesh center [23.6850, 90.3563]
   const [location, setLocation] = useState({ latitude: 23.6850, longitude: 90.3563 });
   const [gpsReady, setGpsReady] = useState(false);
@@ -109,24 +113,24 @@ export default function UserDashboard({ user, onLogout }) {
 
   const startTracking = async () => {
     try {
-      // 1. Socket.io initialization
+      // 1. Socket.io initialization (polling first ensures 100% reliable Android HTTP/SSL handshake)
       if (!socketRef.current) {
         const socket = io(API_URL, {
-          transports: ['websocket', 'polling'],
+          transports: ['polling', 'websocket'],
           reconnection: true,
-          reconnectionAttempts: 10,
-          reconnectionDelay: 2000,
+          reconnectionAttempts: 15,
+          reconnectionDelay: 1000,
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
           console.log('[Mobile] Socket connected:', socket.id);
           setIsConnected(true);
-          socket.emit('join-room', { userId: user.id, role: 'user' });
+          socket.emit('join-room', { userId: currentUserId, role: 'user' });
 
           if (lastValidLocation.current) {
             socket.emit('update-location', {
-              userId: user.id,
+              userId: currentUserId,
               latitude: lastValidLocation.current.latitude,
               longitude: lastValidLocation.current.longitude,
             });
@@ -273,9 +277,11 @@ export default function UserDashboard({ user, onLogout }) {
     onLogout();
   };
 
+  const dynamicTopPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0) + 4;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+    <SafeAreaView style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={true} />
 
       {/* Top Navigation Bar */}
       <View style={styles.topBar}>
