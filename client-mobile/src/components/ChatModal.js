@@ -91,12 +91,12 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
     setInputText('');
   };
 
-  const dynamicTopPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0) + 4;
+  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : insets.top;
   const dynamicBottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 24 : 12) + 8;
 
   return (
     <Modal animationType="slide" transparent={false} visible={visible} onRequestClose={onClose}>
-      <SafeAreaView style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+      <SafeAreaView style={[styles.container, { paddingTop: statusBarHeight }]}>
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={true} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -189,7 +189,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
-    paddingTop: Platform.OS === 'android' ? ((StatusBar.currentHeight || 30) + 6) : 0,
   },
   keyboardContainer: {
     flex: 1,

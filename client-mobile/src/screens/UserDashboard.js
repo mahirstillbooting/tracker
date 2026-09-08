@@ -264,10 +264,13 @@ export default function UserDashboard({ user, onLogout }) {
     onLogout();
   };
 
-  const dynamicTopPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 28) : 0) + 4;
+  // On Android, StatusBar.currentHeight is the notch/status bar height.
+  // We use the max of insets.top (react-native-safe-area-context) or StatusBar.currentHeight
+  // to avoid double-applying padding (styles.container already has paddingTop).
+  const statusBarHeight = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : insets.top;
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: dynamicTopPadding }]}>
+    <SafeAreaView style={[styles.container, { paddingTop: statusBarHeight }]}>
       <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={true} />
 
       {/* Top Navigation Bar */}
@@ -359,7 +362,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f172a',
-    paddingTop: Platform.OS === 'android' ? ((StatusBar.currentHeight || 30) + 6) : 0,
   },
   topBar: {
     minHeight: 64,

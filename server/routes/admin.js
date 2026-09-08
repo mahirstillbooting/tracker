@@ -33,7 +33,7 @@ router.get('/users-overview', verifyAdmin, async (req, res) => {
     const usersOverview = users.map((u) => {
       const lastLoc = locMap.get(u._id.toString());
       return {
-        id: u._id,
+        id: u._id.toString(),
         username: u.username,
         isActive: u.isActive,
         lastLocation: lastLoc

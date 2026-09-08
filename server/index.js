@@ -51,17 +51,19 @@ io.on('connection', (socket) => {
     if (!data) return;
     const { userId, role } = data;
     if (userId) {
-      activeSocketUsers.set(socket.id, userId.toString());
-      socket.join(userId.toString());
-      console.log(`[Socket] Client ${socket.id} joined user room: ${userId}`);
+      const userIdStr = userId.toString();
+      activeSocketUsers.set(socket.id, userIdStr);
+      socket.join(userIdStr);
+      console.log(`[Socket] Client ${socket.id} joined user room: ${userIdStr}`);
 
       if (role !== 'admin') {
         try {
-          const user = await User.findByIdAndUpdate(userId, { isActive: true }, { new: true });
-          const lastLoc = await Location.findOne({ userId }).sort({ updatedAt: -1 });
+          const userIdStr = userId.toString();
+          const user = await User.findByIdAndUpdate(userIdStr, { isActive: true }, { new: true });
+          const lastLoc = await Location.findOne({ userId: userIdStr }).sort({ updatedAt: -1 });
 
           io.emit('location-updated', {
-            userId,
+            userId: userIdStr,
             username: user ? user.username : 'User',
             latitude: lastLoc ? lastLoc.latitude : null,
             longitude: lastLoc ? lastLoc.longitude : null,
@@ -85,19 +87,20 @@ io.on('connection', (socket) => {
       const { userId, latitude, longitude } = data;
       if (!userId || latitude === undefined || longitude === undefined) return;
 
-      activeSocketUsers.set(socket.id, userId.toString());
-      socket.join(userId.toString());
+      const userIdStr = userId.toString();
+      activeSocketUsers.set(socket.id, userIdStr);
+      socket.join(userIdStr);
 
       const updatedLocation = await Location.findOneAndUpdate(
-        { userId },
+        { userId: userIdStr },
         { latitude, longitude, updatedAt: new Date() },
         { upsert: true, new: true }
       ).populate('userId', 'username role isActive');
 
-      await User.findByIdAndUpdate(userId, { isActive: true });
+      await User.findByIdAndUpdate(userIdStr, { isActive: true });
 
       io.emit('location-updated', {
-        userId,
+        userId: userIdStr,
         username: updatedLocation.userId ? updatedLocation.userId.username : 'User',
         latitude,
         longitude,
@@ -164,12 +167,13 @@ io.on('connection', (socket) => {
     const userId = activeSocketUsers.get(socket.id);
     if (userId) {
       activeSocketUsers.delete(socket.id);
+      const userIdStr = userId.toString();
       try {
-        const user = await User.findByIdAndUpdate(userId, { isActive: false }, { new: true });
-        const lastLoc = await Location.findOne({ userId }).sort({ updatedAt: -1 });
+        const user = await User.findByIdAndUpdate(userIdStr, { isActive: false }, { new: true });
+        const lastLoc = await Location.findOne({ userId: userIdStr }).sort({ updatedAt: -1 });
 
         io.emit('location-updated', {
-          userId,
+          userId: userIdStr,
           username: user ? user.username : 'User',
           latitude: lastLoc ? lastLoc.latitude : null,
           longitude: lastLoc ? lastLoc.longitude : null,
