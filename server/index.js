@@ -50,6 +50,14 @@ io.on('connection', (socket) => {
   socket.on('join-room', async (data) => {
     if (!data) return;
     const { userId, role } = data;
+
+    // Validate userId is a proper MongoDB ObjectId (24 hex chars) — blocks bots/scanners
+    if (userId && !/^[a-f\d]{24}$/i.test(userId.toString())) {
+      console.warn(`[Socket] Rejected join-room with invalid userId: "${userId}" from ${socket.id}`);
+      socket.disconnect(true);
+      return;
+    }
+
     if (userId) {
       const userIdStr = userId.toString();
       activeSocketUsers.set(socket.id, userIdStr);
