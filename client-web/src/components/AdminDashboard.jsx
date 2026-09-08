@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { activeUserIcon, offlineUserIcon } from '../utils/leafletFix';
 
-import { SOCKET_SERVER_URL, API_ADMIN_URL as API_BASE_URL } from '../config';
+import { SOCKET_SERVER_URL, SOCKET_OPTIONS, API_ADMIN_URL as API_BASE_URL } from '../config';
 
 function MapFlyTo({ targetCoords }) {
   const map = useMap();
@@ -86,9 +86,7 @@ export default function AdminDashboard({ user, onLogout }) {
     fetchInitialData();
 
     // Socket.io connection & room join
-    const socket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket', 'polling'],
-    });
+    const socket = io(SOCKET_SERVER_URL, SOCKET_OPTIONS);
     socketRef.current = socket;
 
     socket.on('connect', () => {
