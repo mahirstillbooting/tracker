@@ -99,7 +99,7 @@ export default function ChatModal({ visible, onClose, user, socket, targetUser }
       <SafeAreaView style={[styles.container, { paddingTop: dynamicTopPadding }]}>
         <StatusBar barStyle="light-content" backgroundColor="#0f172a" translucent={true} />
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={styles.keyboardContainer}
         >
           {/* Header */}

@@ -177,7 +177,7 @@ export default function UserDashboard({ user, onLogout }) {
 
           if (socketRef.current) {
             socketRef.current.emit('update-location', {
-              userId: user.id,
+              userId: currentUserId,
               latitude,
               longitude,
             });
@@ -204,19 +204,6 @@ export default function UserDashboard({ user, onLogout }) {
               return;
             }
 
-            // Micro-movement step filter < 3m
-            if (lastValidLocation.current) {
-              const dist = getDistanceMeters(
-                lastValidLocation.current.latitude,
-                lastValidLocation.current.longitude,
-                latitude,
-                longitude
-              );
-              if (dist < 3) {
-                return;
-              }
-            }
-
             console.log(`[GPS Watcher] Accepted location: [${latitude.toFixed(5)}, ${longitude.toFixed(5)}]`);
             const newPos = { latitude, longitude };
             lastValidLocation.current = newPos;
@@ -225,9 +212,9 @@ export default function UserDashboard({ user, onLogout }) {
 
             injectMapLocation(latitude, longitude);
 
-            if (socketRef.current && socketRef.current.connected) {
+            if (socketRef.current) {
               socketRef.current.emit('update-location', {
-                userId: user.id,
+                userId: currentUserId,
                 latitude,
                 longitude,
               });
