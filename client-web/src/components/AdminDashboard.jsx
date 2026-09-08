@@ -104,16 +104,20 @@ export default function AdminDashboard({ user, onLogout }) {
 
     // Live Location Updates
     socket.on('location-updated', (data) => {
-      const { userId, username, latitude, longitude, isActive, updatedAt } = data;
-      if (!userId) return;
+      const rawId = data.userId || data.id;
+      if (!rawId) return;
+      const key = rawId.toString();
+
+      const { username, latitude, longitude, isActive, updatedAt } = data;
 
       setUsersMap((prev) => {
-        const existing = prev[userId] || {};
+        const existing = prev[key] || {};
         return {
           ...prev,
-          [userId]: {
+          [key]: {
             ...existing,
-            userId,
+            userId: key,
+            id: key,
             username: username || existing.username || 'User',
             isActive: isActive !== undefined ? isActive : existing.isActive,
             latitude: latitude !== undefined && latitude !== null ? latitude : existing.latitude,
