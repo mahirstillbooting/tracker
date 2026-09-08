@@ -5,31 +5,46 @@ const Location = require('../models/Location');
 const Message = require('../models/Message');
 const { verifyAdmin } = require('../middleware/auth');
 
-// GET /api/admin/users-overview
+// GET /api/admin/users-overview (High-Performance Aggregated Query)
 router.get('/users-overview', verifyAdmin, async (req, res) => {
   try {
-    // 1. Fetch all users with role 'user'
-    const users = await User.find({ role: 'user' }).select('_id username isActive createdAt');
+    const users = await User.find({ role: 'user' }).select('_id username isActive createdAt').lean();
+    const userIds = users.map((u) => u._id);
 
-    // 2. Fetch last known location for each user
-    const usersOverview = await Promise.all(
-      users.map(async (u) => {
-        const lastLoc = await Location.findOne({ userId: u._id }).sort({ updatedAt: -1 });
+    // Single aggregation query for all users' latest locations
+    const latestLocations = await Location.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      { $sort: { updatedAt: -1 } },
+      {
+        $group: {
+          _id: '$userId',
+          latitude: { $first: '$latitude' },
+          longitude: { $first: '$longitude' },
+          updatedAt: { $first: '$updatedAt' },
+        },
+      },
+    ]);
 
-        return {
-          id: u._id,
-          username: u.username,
-          isActive: u.isActive,
-          lastLocation: lastLoc
-            ? {
-                latitude: lastLoc.latitude,
-                longitude: lastLoc.longitude,
-                updatedAt: lastLoc.updatedAt,
-              }
-            : null,
-        };
-      })
-    );
+    const locMap = new Map();
+    latestLocations.forEach((loc) => {
+      locMap.set(loc._id.toString(), loc);
+    });
+
+    const usersOverview = users.map((u) => {
+      const lastLoc = locMap.get(u._id.toString());
+      return {
+        id: u._id,
+        username: u.username,
+        isActive: u.isActive,
+        lastLocation: lastLoc
+          ? {
+              latitude: lastLoc.latitude,
+              longitude: lastLoc.longitude,
+              updatedAt: lastLoc.updatedAt,
+            }
+          : null,
+      };
+    });
 
     return res.json(usersOverview);
   } catch (error) {

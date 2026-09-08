@@ -32,11 +32,10 @@ router.get('/conversation/:userId', verifyToken, async (req, res) => {
 
     // Query messages where user is sender OR user is target of admin reply
     const messages = await Message.find({
-      $or: [
-        { senderId: userId },
-        { targetUserId: userId },
-      ],
-    }).sort({ createdAt: 1 });
+      $or: [{ senderId: userId }, { targetUserId: userId }],
+    })
+      .sort({ createdAt: 1 })
+      .lean();
 
     return res.json(messages);
   } catch (error) {
@@ -45,37 +44,52 @@ router.get('/conversation/:userId', verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/chat/threads (Admin only)
+// GET /api/chat/threads (Admin only - High-Performance Aggregation Query)
 router.get('/threads', verifyToken, async (req, res) => {
   try {
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Admin role required' });
     }
 
-    // Fetch all non-admin users
-    const users = await User.find({ role: 'user' }).select('_id username isActive');
+    const users = await User.find({ role: 'user' }).select('_id username isActive createdAt').lean();
 
-    // For each user, query their latest message
-    const threads = await Promise.all(
-      users.map(async (u) => {
-        const lastMsg = await Message.findOne({
-          $or: [{ senderId: u._id }, { targetUserId: u._id }],
-        }).sort({ createdAt: -1 });
+    // Query all latest messages across all threads in ONE single aggregation query
+    const latestMessages = await Message.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ['$recipientRole', 'user'] },
+              '$targetUserId',
+              '$senderId',
+            ],
+          },
+          lastMessage: { $first: '$content' },
+          lastMessageSender: { $first: '$senderUsername' },
+          updatedAt: { $first: '$createdAt' },
+        },
+      },
+    ]);
 
-        return {
-          userId: u._id,
-          username: u.username,
-          isActive: u.isActive,
-          lastMessage: lastMsg ? lastMsg.content : null,
-          lastMessageSender: lastMsg ? lastMsg.senderUsername : null,
-          updatedAt: lastMsg ? lastMsg.createdAt : u.createdAt,
-        };
-      })
-    );
+    const msgMap = new Map();
+    latestMessages.forEach((m) => {
+      if (m._id) msgMap.set(m._id.toString(), m);
+    });
 
-    // Sort threads by latest message timestamp
+    const threads = users.map((u) => {
+      const lastMsg = msgMap.get(u._id.toString());
+      return {
+        userId: u._id,
+        username: u.username,
+        isActive: u.isActive,
+        lastMessage: lastMsg ? lastMsg.lastMessage : null,
+        lastMessageSender: lastMsg ? lastMsg.lastMessageSender : null,
+        updatedAt: lastMsg ? lastMsg.updatedAt : u.createdAt,
+      };
+    });
+
     threads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-
     return res.json(threads);
   } catch (error) {
     console.error('Error fetching chat threads:', error);

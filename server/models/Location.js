@@ -20,4 +20,6 @@ const locationSchema = new mongoose.Schema({
   },
 });
 
+locationSchema.index({ userId: 1, updatedAt: -1 });
+
 module.exports = mongoose.model('Location', locationSchema);
