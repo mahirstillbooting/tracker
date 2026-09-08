@@ -15,7 +15,7 @@ import { io } from 'socket.io-client';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LogOut, Users, ShieldCheck, Navigation2, X, ChevronUp, MessageSquare } from 'lucide-react-native';
-import { API_URL } from '../config';
+import { API_URL, SOCKET_OPTIONS, wakeServer } from '../config';
 import ChatModal from '../components/ChatModal';
 
 const getAdminLeafletHtml = () => `
@@ -145,10 +145,13 @@ export default function AdminDashboard({ user, onLogout }) {
 
     fetchUsersOverview();
 
-    const socket = io(API_URL, {
-      transports: ['websocket', 'polling'],
-    });
+    const socket = io(API_URL, SOCKET_OPTIONS);
     socketRef.current = socket;
+
+    socket.on('connect_error', (err) => {
+      console.log('[Mobile Admin] Socket connect error, retrying:', err.message);
+      wakeServer();
+    });
 
     socket.on('connect', () => {
       console.log('[Mobile Admin] Socket connected:', socket.id);

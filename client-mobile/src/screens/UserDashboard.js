@@ -16,7 +16,7 @@ import * as Location from 'expo-location';
 import { io } from 'socket.io-client';
 import { LogOut, User, Navigation, MessageSquare } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { API_URL } from '../config';
+import { API_URL, SOCKET_OPTIONS, wakeServer } from '../config';
 import ChatModal from '../components/ChatModal';
 
 // Haversine Distance Utility (calculates distance in meters)
@@ -115,13 +115,15 @@ export default function UserDashboard({ user, onLogout }) {
     try {
       // 1. Socket.io initialization (polling first ensures 100% reliable Android HTTP/SSL handshake)
       if (!socketRef.current) {
-        const socket = io(API_URL, {
-          transports: ['polling', 'websocket'],
-          reconnection: true,
-          reconnectionAttempts: 15,
-          reconnectionDelay: 1000,
-        });
+        wakeServer();
+
+        const socket = io(API_URL, SOCKET_OPTIONS);
         socketRef.current = socket;
+
+        socket.on('connect_error', (err) => {
+          console.log('[Mobile] Socket connect error, retrying:', err.message);
+          wakeServer();
+        });
 
         socket.on('connect', () => {
           console.log('[Mobile] Socket connected:', socket.id);

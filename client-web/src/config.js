@@ -9,3 +9,15 @@ export const SOCKET_SERVER_URL = import.meta.env.VITE_SOCKET_URL || BASE_URL;
 export const API_AUTH_URL = `${BASE_URL}/api/auth`;
 export const API_ADMIN_URL = `${BASE_URL}/api`;
 export const API_CHAT_URL = `${BASE_URL}/api/chat`;
+
+// Shared Socket.io options. The backend sleeps on Render's free plan and a cold
+// start can take well over a minute, so the handshake timeout is generous and
+// reconnection never gives up.
+export const SOCKET_OPTIONS = {
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 60000,
+};

@@ -5,7 +5,7 @@ import { LogOut, User, Navigation, Radio, MapPin, AlertTriangle } from 'lucide-r
 import { userIcon } from '../utils/leafletFix';
 import UserChatWidget from './UserChatWidget';
 
-import { SOCKET_SERVER_URL } from '../config';
+import { SOCKET_SERVER_URL, SOCKET_OPTIONS } from '../config';
 
 function MapRecenter({ position }) {
   const map = useMap();
@@ -26,9 +26,7 @@ export default function UserDashboard({ user, onLogout }) {
   const watchIdRef = useRef(null);
 
   useEffect(() => {
-    const socket = io(SOCKET_SERVER_URL, {
-      transports: ['websocket', 'polling'],
-    });
+    const socket = io(SOCKET_SERVER_URL, SOCKET_OPTIONS);
     socketRef.current = socket;
 
     socket.on('connect', () => {
